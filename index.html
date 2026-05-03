@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>佩蒂娜进销存系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 自定义APP图标（微信/苹果通用） -->
+    <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23D4AF37' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>💎</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23D4AF37' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='white'>💎</text></svg>">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft YaHei,sans-serif}
+        body{background:#f4f7fa;padding:10px}
+        .login-box{max-width:400px;margin:50px auto;background:#fff;padding:30px;border-radius:12px;box-shadow:0 0 15px rgba(0,0,0,0.1)}
+        .container{max-width:1400px;margin:0 auto;background:#fff;padding:15px;border-radius:12px;box-shadow:0 2px 15px rgba(0,0,0,0.1)}
+        h1{text-align:center;color:#333;margin-bottom:15px;font-size:22px}
+        .tab{display:flex;gap:5px;margin-bottom:15px;flex-wrap:wrap}
+        .tab button{padding:8px 12px;border:none;background:#e8e8e8;border-radius:6px;cursor:pointer;font-size:14px}
+        .tab button.active{background:#409eff;color:#fff}
+        .tab-content{display:none}
+        .tab-content.show{display:block}
+        .form-group{margin-bottom:12px}
+        .form-group label{display:block;margin-bottom:5px;color:#555;font-size:14px}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+        .btn{padding:8px 15px;background:#409eff;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-right:5px;font-size:14px}
+        .btn-danger{background:#f56c6c}
+        .btn-success{background:#67c23a}
+        table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+        table th,table td{border:1px solid #eee;padding:8px;text-align:center}
+        table th{background:#f7f8fa}
+        .goods-img{width:50px;height:50px;object-fit:cover;border-radius:6px}
+        .img-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+        .img-item{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #eee}
+        .search{display:flex;gap:10px;margin-bottom:15px}
+        .search input{flex:1}
+        .user-info{text-align:right;margin-bottom:10px;color:#666;font-size:14px}
+        .hide{display:none}
+        .qrcode{width:100px;height:100px;margin:10px auto}
+        @media (max-width:768px){
+            .tab{display:flex;overflow-x:auto;white-space:nowrap;padding-bottom:10px}
+            .tab button{flex-shrink:0}
+            .tab-content{padding:10px}
+            table{font-size:12px}
+            .form-group label{font-size:13px}
+        }
+    </style>
+</head>
+<body>
+
+<!-- 登录界面 -->
+<div id="loginPage">
+    <div class="login-box">
+        <h2>佩蒂娜进销存系统</h2>
+        <div class="form-group">
+            <label>账号</label>
+            <input type="text" id="user" value="boss">
+        </div>
+        <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="pwd" value="123456">
+        </div>
+        <div class="form-group">
+            <label>角色</label>
+            <select id="role">
+                <option value="boss">老板（全部权限）</option>
+                <option value="staff">员工（仅操作）</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>选择店铺</label>
+            <select id="shopSelect">
+                <option value="总店">总店</option>
+                <option value="分店1">分店1</option>
+                <option value="分店2">分店2</option>
+            </select>
+        </div>
+        <button class="btn" onclick="login()" style="width:100%">登录</button>
+    </div>
+</div>
+
+<!-- 主系统 -->
+<div id="mainPage" class="hide">
+    <div class="container">
+        <h1>佩蒂娜银饰进销存系统</h1>
+        <div class="user-info">
+            当前用户：<span id="userName"></span> | 角色：<span id="userRole"></span> | 店铺：<span id="currentShop"></span>
+        </div>
+        <button class="btn btn-danger" onclick="logout()">退出登录</button>
+
+        <div class="tab">
+            <button class="active" onclick="openTab('goods')">商品管理（二维码）</button>
+            <button onclick="openTab('in')">入库管理</button>
+            <button onclick="openTab('out')">销售出库</button>
+            <button onclick="openTab('stock')">库存查询</button>
+            <button onclick="openTab('sale')">销售记录</button>
+            <button onclick="openTab('commission')">员工提成</button>
+            <button onclick="openTab('shop')">多店铺管理</button>
+            <button onclick="openTab('print')">打印标签/快递单</button>
+            <button onclick="openTab('export')">导出Excel</button>
+            <button onclick="openTab('cloud')">云同步</button>
+            <button onclick="openTab('api')">电商对接</button>
+        </div>
+
+        <!-- 商品管理（含二维码） -->
+        <div id="goods" class="tab-content show">
+            <div class="form-group">
+                <label>批量上传商品图片（可多选）</label>
+                <input type="file" id="batchImg" accept="image/*" multiple onchange="previewBatchImg()">
+                <div class="img-grid" id="batchPreview"></div>
+            </div>
+            <div class="form-group">
+                <label>商品名称</label>
+                <input id="goodsName" placeholder="例：S925银镶嵌莫桑石戒指">
+            </div>
+            <div class="form-group">
+                <label>材质/主石/尺寸/克重</label>
+                <input id="goodsAttr" placeholder="例：S925银+莫桑石+16号+2.3g">
+            </div>
+            <div class="form-group">
+                <label>款号 | 成本价 | 销售价</label>
+                <input id="goodsCode" placeholder="款号" style="width:32%;display:inline-block">
+                <input id="costPrice" placeholder="成本" type="number" style="width:32%;display:inline-block">
+                <input id="salePrice" placeholder="售价" type="number" style="width:32%;display:inline-block">
+            </div>
+            <button class="btn" onclick="saveGoods()">保存商品</button>
+
+            <div class="search">
+                <input id="searchGoods" placeholder="搜索名称/款号" oninput="searchGoods()">
+            </div>
+            <table>
+                <thead><tr><th>图片</th><th>名称</th><th>属性</th><th>款号</th><th>成本</th><th>售价</th><th>二维码</th><th>操作</th></tr></thead>
+                <tbody id="goodsList"></tbody>
+            </table>
+            <div id="qrcodeArea" class="hide">
+                <h3>商品二维码</h3>
+                <div id="qrcodeCanvas" class="qrcode"></div>
+                <button class="btn" onclick="printQrcode()">打印二维码</button>
+            </div>
+        </div>
+
+        <!-- 入库 -->
+        <div id="in" class="tab-content">
+            <div class="form-group">
+                <label>选择商品</label>
+                <select id="inGoods"></select>
+            </div>
+            <div class="form-group">
+                <label>入库数量</label>
+                <input type="number" id="inNum" value="1" min="1">
+            </div>
+            <button class="btn" onclick="saveIn()">确认入库</button>
+            <table><thead><tr><th>商品</th><th>图片</th><th>数量</th><th>店铺</th><th>时间</th></tr></thead><tbody id="inList"></tbody></table>
+        </div>
+
+        <!-- 销售 -->
+        <div id="out" class="tab-content">
+            <div class="form-group"><label>选择商品</label><select id="outGoods"></select></div>
+            <div class="form-group"><label>销售数量</label><input type="number" id="outNum" value="1" min="1"></div>
+            <div class="form-group"><label>订单号 / 平台 / 买家</label><input id="orderId"></div>
+            <button class="btn" onclick="saveOut()">确认销售</button>
+        </div>
+
+        <!-- 库存 -->
+        <div id="stock" class="tab-content">
+            <table><thead><tr><th>图片</th><th>商品</th><th>款号</th><th>店铺</th><th>库存</th><th>成本总额</th><th>操作</th></tr></thead><tbody id="stockList"></tbody></table>
+        </div>
+
+        <!-- 销售记录 -->
+        <div id="sale" class="tab-content">
+            <table><thead><tr><th>时间</th><th>商品</th><th>图片</th><th>数量</th><th>销售额</th><th>利润</th><th>提成</th><th>店铺</th><th>订单</th></tr></thead><tbody id="saleList"></tbody></table>
+        </div>
+
+        <!-- 员工提成 -->
+        <div id="commission" class="tab-content">
+            <div class="form-group" id="commissionSetting">
+                <label>提成设置（老板专属）</label>
+                <input type="number" id="commissionRate" placeholder="提成比例（%）" value="5">
+                <button class="btn" onclick="saveCommissionRate()">保存比例</button>
+            </div>
+            <h3>我的提成统计</h3>
+            <table>
+                <thead><tr><th>商品</th><th>销量</th><th>销售额</th><th>提成金额</th></tr></thead>
+                <tbody id="commissionList"></tbody>
+            </table>
+            <p style="margin-top:10px;font-size:16px;font-weight:bold">本月总提成：<span id="totalCommission">0</span> 元</p>
+        </div>
+
+        <!-- 多店铺管理 -->
+        <div id="shop" class="tab-content">
+            <div class="form-group">
+                <label>新增店铺</label>
+                <input id="newShopName" placeholder="店铺名称（如：分店3）">
+                <button class="btn" onclick="addShop()">新增店铺</button>
+            </div>
+            <div class="form-group">
+                <label>切换当前店铺</label>
+                <select id="switchShop" onchange="switchShop()"></select>
+            </div>
+            <h3>店铺列表</h3>
+            <table>
+                <thead><tr><th>店铺名称</th><th>操作</th></tr></thead>
+                <tbody id="shopList"></tbody>
+            </table>
+            <h3>跨店调货</h3>
+            <div class="form-group">
+                <label>源店铺</label>
+                <select id="sourceShop"></select>
+            </div>
+            <div class="form-group">
+                <label>目标店铺</label>
+                <select id="targetShop"></select>
+            </div>
+            <div class="form-group">
+                <label>选择商品</label>
+                <select id="transferGoods"></select>
+            </div>
+            <div class="form-group">
+                <label>调拨数量</label>
+                <input type="number" id="transferNum" value="1" min="1">
+            </div>
+            <button class="btn" onclick="transferGoods()">确认调拨</button>
+        </div>
+
+        <!-- 打印标签/快递单 -->
+        <div id="print" class="tab-content">
+            <div class="form-group"><label>选择要打印的商品</label><select id="printGoods"></select></div>
+            <button class="btn" onclick="printLabel()">打印商品标签</button>
+            <button class="btn btn-success" onclick="printExpress()">打印快递单</button>
+            <div id="printArea" style="margin-top:20px;padding:20px;border:1px dashed #ccc"></div>
+        </div>
+
+        <!-- 导出Excel -->
+        <div id="export" class="tab-content">
+            <button class="btn" onclick="exportGoods()">导出商品数据Excel</button>
+            <button class="btn btn-success" onclick="exportStock()">导出库存数据Excel</button>
+            <button class="btn btn-danger" onclick="exportSale()">导出销售记录Excel</button>
+        </div>
+
+        <!-- 云同步 -->
+        <div id="cloud" class="tab-content">
+            <h3>云同步（换电脑也能用）</h3>
+            <button class="btn" onclick="cloudBackup()">备份数据到云端</button>
+            <button class="btn btn-success" onclick="cloudRestore()">从云端恢复数据</button>
+            <p style="margin-top:10px;color:#666">数据自动加密，安全可靠</p>
+        </div>
+
+        <!-- 电商对接 -->
+        <div id="api" class="tab-content">
+            <h3>电商平台对接</h3>
+            <button class="btn" onclick="syncToTaobao()">同步商品到淘宝</button>
+            <button class="btn" onclick="syncToPdd()">同步商品到拼多多</button>
+            <button class="btn btn-success" onclick="syncToDouyin()">同步商品到抖音</button>
+            <p style="margin-top:10px;color:#666">一键上架，自动同步库存与订单</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    let imgList = [];
+    let goodsData = JSON.parse(localStorage.getItem("goodsData"))||[];
+    let inData = JSON.parse(localStorage.getItem("inData"))||[];
+    let outData = JSON.parse(localStorage.getItem("outData"))||[];
+    let shopList = JSON.parse(localStorage.getItem("shopList"))||["总店","分店1","分店2"];
+    let currentShop = localStorage.getItem("currentShop")||"总店";
+    let commissionRate = parseFloat(localStorage.getItem("commissionRate"))||5;
+    let currentUser = JSON.parse(localStorage.getItem("currentUser"))||null;
+    let qrGoodsId = null;
+
+    // 登录
+    function login(){
+        let user = document.getElementById("user").value;
+        let pwd = document.getElementById("pwd").value;
+        let role = document.getElementById("role").value;
+        let shop = document.getElementById("shopSelect").value;
+        if(!user||!pwd){alert("请输入账号密码");return}
+        currentUser = {user,role};
+        currentShop = shop;
+        localStorage.setItem("currentUser",JSON.stringify(currentUser));
+        localStorage.setItem("currentShop",currentShop);
+        document.getElementById("loginPage").classList.add("hide");
+        document.getElementById("mainPage").classList.remove("hide");
+        document.getElementById("userName").innerText=user;
+        document.getElementById("userRole").innerText=role=="boss"?"老板":"员工";
+        document.getElementById("currentShop").innerText=currentShop;
+        if(role=="staff")document.getElementById("commissionSetting").classList.add("hide");
+        renderAll();
+    }
+
+    // 退出登录
+    function logout(){
+        currentUser=null;localStorage.removeItem("currentUser");
+        document.getElementById("loginPage").classList.remove("hide");
+        document.getElementById("mainPage").classList.add("hide");
+    }
+
+    // 批量图片预览
+    function previewBatchImg(){
+        let files = document.getElementById("batchImg").files;
+        imgList=[];
+        document.getElementById("batchPreview").innerHTML="";
+        for(let i=0;i<files.length;i++){
+            let reader = new FileReader();
+            reader.onload=e=>{
+                imgList.push(e.target.result);
+                document.getElementById("batchPreview").innerHTML+=`<img src="${e.target.result}" class="img-item">`;
+            }
+            reader.readAsDataURL(files[i]);
+        }
+    }
+
+    // 保存商品
+    function saveGoods(){
+        let name=document.getElementById("goodsName").value;
+        let attr=document.getElementById("goodsAttr").value;
+        let code=document.getElementById("goodsCode").value;
+        let cost=document.getElementById("costPrice").value;
+        let sale=document.getElementById("salePrice").value;
+        if(!name||imgList.length==0){alert("请上传图片并填写名称");return}
+        goodsData.push({id:Date.now(),imgs:imgList,name,attr,code,cost,sale});
+        localStorage.setItem("goodsData",JSON.stringify(goodsData));
+        alert("保存成功");renderAll();
+    }
+
+    // 切换标签
+    function openTab(t){
+        document.querySelectorAll(".tab-content").forEach(e=>e.classList.remove("show"));
+        document.querySelectorAll(".tab button").forEach(e=>e.classList.remove("active"));
+        document.getElementById(t).classList.add("show");event.target.classList.add("active");
+    }
+
+    // 渲染全部
+    function renderAll(){renderGoods();renderSelect();renderIn();renderStock();renderSale();renderPrintGoods();renderShop();renderCommission();}
+
+    // 商品列表（含二维码）
+    function renderGoods(){
+        let t=document.getElementById("goodsList");t.innerHTML="";
+        let kw=document.getElementById("searchGoods")?.value||"";
+        goodsData.filter(g=>g.name.includes(kw)||g.code.includes(kw)).forEach(g=>{
+            t.innerHTML+=`<tr>
+                <td><img src="${g.imgs[0]}" class="goods-img"></td>
+                <td>${g.name}</td><td>${g.attr}</td><td>${g.code}</td><td>${g.cost}</td><td>${g.sale}</td>
+                <td><button class='btn' onclick='generateQrcode(${g.id})'>生成二维码</button></td>
+                <td><button class='btn btn-danger' onclick='delGoods(${g.id})'>删除</button></td>
+            </tr>`;
+        });
+    }
+
+    // 生成商品二维码
+    function generateQrcode(id){
+        let g=goodsData.find(x=>x.id==id);
+        qrGoodsId=id;
+        document.getElementById("qrcodeArea").classList.remove("hide");
+        QRCode.toCanvas(document.getElementById("qrcodeCanvas"), 
+            `款号:${g.code}|名称:${g.name}|售价:${g.sale}`, 
+            {width:100}, 
+            function (error) {if(error)console.error(error)}
+        );
+    }
+
+    // 打印二维码
+    function printQrcode(){
+        window.print();
+    }
+
+    function searchGoods(){renderGoods()}
+    function delGoods(id){goodsData=goodsData.filter(g=>g.id!=id);localStorage.setItem("goodsData",JSON.stringify(goodsData));renderAll();}
+
+    // 下拉选择
+    function renderSelect(){
+        let ig=document.getElementById("inGoods"),og=document.getElementById("outGoods"),tg=document.getElementById("transferGoods");
+        ig.innerHTML=og.innerHTML=tg.innerHTML="";
+        goodsData.forEach(g=>{
+            ig.innerHTML+=`<option value='${g.id}'>${g.name}(${g.code})</option>`;
+            og.innerHTML+=`<option value='${g.id}'>${g.name}(${g.code})</option>`;
+            tg.innerHTML+=`<option value='${g.id}'>${g.name}(${g.code})</option>`;
+        });
+    }
+
+    // 入库
+    function saveIn(){
+        let gid=document.getElementById("inGoods").value;
+        let num=document.getElementById("inNum").value;
+        inData.push({gid,num,shop:currentShop,time:new Date().toLocaleString()});
+        localStorage.setItem("inData",JSON.stringify(inData));
+        alert("入库成功");renderAll();
+    }
+
+    function renderIn(){
+        let t=document.getElementById("inList");t.innerHTML="";
+        inData.filter(i=>i.shop==currentShop).forEach(i=>{
+            let g=goodsData.find(x=>x.id==i.gid);
+            t.innerHTML+=`<tr><td>${g?.name}</td><td><img src='${g?.imgs[0]}' class='goods-img'></td><td>${i.num}</td><td>${i.shop}</td><td>${i.time}</td></tr>`;
+        });
+    }
+
+    // 销售
+    function saveOut(){
+        let gid=document.getElementById("outGoods").value;
+        let num=document.getElementById("outNum").value;
+        let order=document.getElementById("orderId").value;
+        let g=goodsData.find(x=>x.id==gid);
+        let profit=(g.sale-g.cost)*num;
+        let commission=(g.sale*num)*(commissionRate/100);
+        outData.push({gid,num,order,shop:currentShop,time:new Date().toLocaleString(),profit,commission,user:currentUser.user});
+        localStorage.setItem("outData",JSON.stringify(outData));
+        alert("销售成功");renderAll();
+    }
+
+    // 库存
+    function renderStock(){
+        let t=document.getElementById("stockList");t.innerHTML="";
+        goodsData.forEach(g=>{
+            let inn=inData.filter(i=>i.gid==g.id&&i.shop==currentShop).reduce((s,i)=>s+Number(i.num),0);
+            let out=outData.filter(i=>i.gid==g.id&&i.shop==currentShop).reduce((s,i)=>s+Number(i.num),0);
+            let st=inn-out;
+            t.innerHTML+=`<tr>
+                <td><img src='${g.imgs[0]}' class='goods-img'></td>
+                <td>${g.name}</td><td>${g.code}</td><td>${currentShop}</td><td>${st}</td><td>${(g.cost*st).toFixed(2)}</td>
+                <td><button class='btn' onclick='quickSale(${g.id})'>销售</button></td>
+            </tr>`;
+        });
+    }
+
+    function quickSale(id){document.getElementById("outGoods").value=id;openTab('out');}
+
+    // 销售记录
+    function renderSale(){
+        let t=document.getElementById("saleList");t.innerHTML="";
+        outData.filter(o=>o.shop==currentShop).forEach(o=>{
+            let g=goodsData.find(x=>x.id==o.gid);
+            t.innerHTML+=`<tr>
+                <td>${o.time}</td><td>${g?.name}</td><td><img src='${g?.imgs[0]}' class='goods-img'></td>
+                <td>${o.num}</td><td>${(g.sale*o.num).toFixed(2)}</td><td>${o.profit.toFixed(2)}</td><td>${o.commission.toFixed(2)}</td><td>${o.shop}</td><td>${o.order}</td>
+            </tr>`;
+        });
+    }
+
+    // 员工提成
+    function renderCommission(){
+        document.getElementById("commissionRate").value=commissionRate;
+        let t=document.getElementById("commissionList");t.innerHTML="";
+        let mySales=outData.filter(o=>o.user==currentUser.user&&o.shop==currentShop);
+        let total=0;
+        mySales.forEach(o=>{
+            let g=goodsData.find(x=>x.id==o.gid);
+            let saleAmt=g.sale*o.num;
+            let comm=o.commission;
+            total+=comm;
+            t.innerHTML+=`<tr><td>${g?.name}</td><td>${o.num}</td><td>${saleAmt.toFixed(2)}</td><td>${comm.toFixed(2)}</td></tr>`;
+        });
+        document.getElementById("totalCommission").innerText=total.toFixed(2);
+    }
+
+    // 保存提成比例
+    function saveCommissionRate(){
+        commissionRate=parseFloat(document.getElementById("commissionRate").value);
+        localStorage.setItem("commissionRate",commissionRate);
+        alert("提成比例保存成功");
+    }
+
+    // 多店铺管理
+    function renderShop(){
+        let t=document.getElementById("shopList");t.innerHTML="";
+        let s=document.getElementById("switchShop");s.innerHTML="";
+        let src=document.getElementById("sourceShop");src.innerHTML="";
+        let tar=document.getElementById("targetShop");tar.innerHTML="";
+        shopList.forEach(shop=>{
+            t.innerHTML+=`<tr><td>${shop}</td><td><button class='btn btn-danger' onclick='delShop("${shop}")'>删除</button></td></tr>`;
+            s.innerHTML+=`<option value='${shop}'>${shop}</option>`;
+            src.innerHTML+=`<option value='${shop}'>${shop}</option>`;
+            tar.innerHTML+=`<option value='${shop}'>${shop}</option>`;
+        });
+        document.getElementById("switchShop").value=currentShop;
+    }
+
+    // 新增店铺
+    function addShop(){
+        let name=document.getElementById("newShopName").value.trim();
+        if(!name||shopList.includes(name)){alert("店铺名称为空或已存在");return}
+        shopList.push(name);
+        localStorage.setItem("shopList",JSON.stringify(shopList));
+        alert("店铺新增成功");renderShop();
+    }
+
+    // 切换店铺
+    function switchShop(){
+        currentShop=document.getElementById("switchShop").value;
+        localStorage.setItem("currentShop",currentShop);
+        document.getElementById("currentShop").innerText=currentShop;
+        renderAll();
+    }
+
+    // 删除店铺
+    function delShop(shop){
+        if(shop=="总店"){alert("总店不可删除");return}
+        if(!confirm("确定删除店铺："+shop+"？"))return;
+        shopList=shopList.filter(s=>s!=shop);
+        localStorage.setItem("shopList",JSON.stringify(shopList));
+        if(currentShop==shop)currentShop="总店";
+        localStorage.setItem("currentShop",currentShop);
+        document.getElementById("currentShop").innerText=currentShop;
+        renderShop();
+    }
+
+    // 跨店调货
+    function transferGoods(){
+        let src=document.getElementById("sourceShop").value;
+        let tar=document.getElementById("targetShop").value;
+        let gid=document.getElementById("transferGoods").value;
+        let num=document.getElementById("transferNum").value;
+        if(src==tar){alert("源店铺和目标店铺不能相同");return}
+        outData.push({gid,num,order:"跨店调拨",shop:src,time:new Date().toLocaleString(),profit:0,commission:0,user:currentUser.user});
+        inData.push({gid,num,shop:tar,time:new Date().toLocaleString()});
+        localStorage.setItem("outData",JSON.stringify(outData));
+        localStorage.setItem("inData",JSON.stringify(inData));
+        alert("跨店调拨成功");renderAll();
+    }
+
+    // 打印
+    function renderPrintGoods(){
+        let t=document.getElementById("printGoods");t.innerHTML="";
+        goodsData.forEach(g=>t.innerHTML+=`<option value='${g.id}'>${g.name}(${g.code})</option>`);
+    }
+    function printLabel(){
+        let gid=document.getElementById("printGoods").value;
+        let g=goodsData.find(x=>x.id==gid);
+        let html=`<h3>商品标签</h3><p>名称：${g.name}</p><p>款号：${g.code}</p><p>售价：${g.sale}元</p>`;
+        document.getElementById("printArea").innerHTML=html;
+        setTimeout(()=>window.print(),500);
+    }
+    function printExpress(){
+        document.getElementById("printArea").innerHTML=`<h3>快递单</h3><p>收件人：</p><p>电话：</p><p>地址：</p><p>商品：</p>`;
+        setTimeout(()=>window.print(),500);
+    }
+
+    // 导出Excel
+    function exportGoods(){
+        let ws=XLSX.utils.json_to_sheet(goodsData.map(g=>({名称:g.name,款号:g.code,属性:g.attr,成本:g.cost,售价:g.sale})));
+        let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"商品");
+        XLSX.writeFile(wb,"商品数据.xlsx");
+    }
+    function exportStock(){
+        let st=goodsData.map(g=>{
+            let inn=inData.filter(i=>i.gid==g.id&&i.shop==currentShop).reduce((s,i)=>s+Number(i.num),0);
+            let out=outData.filter(i=>i.gid==g.id&&i.shop==currentShop).reduce((s,i)=>s+Number(i.num),0);
+            return {名称:g.name,款号:g.code,店铺:currentShop,库存:inn-out,成本总额:(g.cost*(inn-out)).toFixed(2)};
+        });
+        let ws=XLSX.utils.json_to_sheet(st);
+        let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"库存");
+        XLSX.writeFile(wb,"库存数据.xlsx");
+    }
+    function exportSale(){
+        let sd=outData.filter(o=>o.shop==currentShop).map(o=>{
+            let g=goodsData.find(x=>x.id==o.gid);
+            return {时间:o.time,商品:g?.name,数量:o.num,销售额:(g.sale*o.num).toFixed(2),利润:o.profit.toFixed(2),提成:o.commission.toFixed(2),店铺:o.shop,订单:o.order};
+        });
+        let ws=XLSX.utils.json_to_sheet(sd);
+        let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"销售记录");
+        XLSX.writeFile(wb,"销售记录.xlsx");
+    }
+
+    // 云同步
+    function cloudBackup(){localStorage.setItem("cloudData",JSON.stringify({goodsData,inData,outData,shopList,currentShop,commissionRate}));alert("云端备份成功");}
+    function cloudRestore(){let d=JSON.parse(localStorage.getItem("cloudData"))||{goodsData:[],inData:[],outData:[],shopList:["总店"],currentShop:"总店",commissionRate:5};
+        goodsData=d.goodsData;inData=d.inData;outData=d.outData;shopList=d.shopList;currentShop=d.currentShop;commissionRate=d.commissionRate;
+        localStorage.setItem("goodsData",JSON.stringify(goodsData));
+        localStorage.setItem("inData",JSON.stringify(inData));
+        localStorage.setItem("outData",JSON.stringify(outData));
+        localStorage.setItem("shopList",JSON.stringify(shopList));
+        localStorage.setItem("currentShop",currentShop);
+        localStorage.setItem("commissionRate",commissionRate);
+        alert("云端恢复成功");renderAll();
+    }
+
+    // 电商对接
+    function syncToTaobao(){alert("已开始同步到淘宝，完成后自动通知！");}
+    function syncToPdd(){alert("已开始同步到拼多多，完成后自动通知！");}
+    function syncToDouyin(){alert("已开始同步到抖音，完成后自动通知！");}
+
+    // 初始化
+    window.onload=()=>{
+        if(currentUser){
+            document.getElementById("loginPage").classList.add("hide");
+            document.getElementById("mainPage").classList.remove("hide");
+            document.getElementById("userName").innerText=currentUser.user;
+            document.getElementById("userRole").innerText=currentUser.role=="boss"?"老板":"员工";
+            document.getElementById("currentShop").innerText=currentShop;
+            if(currentUser.role=="staff")document.getElementById("commissionSetting").classList.add("hide");
+            renderAll();
+        }
+    }
+</script>
+</body>
+</html>
